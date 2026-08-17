@@ -35,9 +35,7 @@ ALLOWED_MODELS = {
     "groq": [
         "openai/gpt-oss-120b",
         "openai/gpt-oss-20b",
-        "llama-3.3-70b-versatile",
         "qwen/qwen3.6-27b",
-        "llama-3.1-8b-instant",
     ],
     "openrouter": [
         "nvidia/nemotron-3.5-lightning:free",
@@ -61,7 +59,6 @@ ALLOWED_MODELS = {
     # Cerebras – free tier, sehr schnelle Inferenz
     "cerebras": [
         "gpt-oss-120b",
-        "zai-glm-4.7",
         "gemma-4-31b",
     ],
 }
@@ -96,7 +93,11 @@ MODEL_MIGRATIONS = {
     "qwen/qwen3-235b-a22b:free": ("openrouter", "nvidia/nemotron-3-super-120b-a12b:free"),
     "open-mistral-nemo": ("mistral", "ministral-8b-latest"),
     "llama-3.3-70b": ("cerebras", "gpt-oss-120b"),
-    "qwen-3-32b": ("cerebras", "zai-glm-4.7"),
+    "qwen-3-32b": ("cerebras", "gemma-4-31b"),
+    # 17.06.2026: von Groq bzw. Cerebras entfernte Modelle -> beste Nachfolger
+    "llama-3.3-70b-versatile": ("groq", "openai/gpt-oss-120b"),
+    "llama-3.1-8b-instant": ("groq", "openai/gpt-oss-20b"),
+    "zai-glm-4.7": ("cerebras", "gemma-4-31b"),
     "openai/gpt-4.1": ("groq", "openai/gpt-oss-120b"),
     "openai/gpt-4.1-mini": ("groq", "openai/gpt-oss-120b"),
     "openai/gpt-4o-mini": ("gemini", "gemini-3.5-flash-lite"),
@@ -112,8 +113,7 @@ PAID_MODELS_NO_FALLBACK = {"deepseek/deepseek-v4-flash", "deepseek/deepseek-v4-p
 FALLBACK_ORDER = {
     "gemini": ["gemini-3.5-flash", "gemini-3.6-flash", "gemini-3.1-pro-preview",
                "gemini-3.5-flash-lite", "gemini-3.1-flash-lite"],
-    "groq": ["openai/gpt-oss-120b", "llama-3.3-70b-versatile", "qwen/qwen3.6-27b",
-             "openai/gpt-oss-20b", "llama-3.1-8b-instant"],
+    "groq": ["openai/gpt-oss-120b", "qwen/qwen3.6-27b", "openai/gpt-oss-20b"],
     "openrouter": [
         "nvidia/nemotron-3.5-lightning:free",
         "nvidia/nemotron-3-ultra-550b-a55b:free",
@@ -123,7 +123,7 @@ FALLBACK_ORDER = {
         "nvidia/nemotron-nano-9b-v2:free",
     ],
     "mistral": ["mistral-small-latest", "ministral-8b-latest"],
-    "cerebras": ["gpt-oss-120b", "zai-glm-4.7", "gemma-4-31b"],
+    "cerebras": ["gpt-oss-120b", "gemma-4-31b"],
 }
 
 # OpenAI-kompatible Backends: base_url + Env-Keys (Reihenfolge = Prio,

@@ -722,19 +722,18 @@ class AIEngine:
             self.config["correlation_guard"] = bool(updates["correlation_guard"])
         if "provider" in updates and "model" in updates:
             prov, mod = updates["provider"], updates["model"]
-            if prov in ALLOWED_MODELS and mod in ALLOWED_MODELS[prov]:
+            if prov in ALLOWED_MODELS and mod in ai_providers.allowed_models(prov):
                 self.config["provider"], self.config["model"] = prov, mod
                 # Wechselt der Nutzer das Modell manuell, reset des Fallback-States.
                 self._effective_model = None
         elif "model" in updates:
             mod = updates["model"]
-            # Finde Provider automatisch anhand des Modells
-            for prov, models in ALLOWED_MODELS.items():
-                if mod in models:
-                    self.config["model"] = mod
-                    self.config["provider"] = prov
-                    self._effective_model = None
-                    break
+            # Finde Provider automatisch anhand des Modells (inkl. neu entdeckter)
+            prov = ai_providers.provider_for_model(mod)
+            if prov:
+                self.config["model"] = mod
+                self.config["provider"] = prov
+                self._effective_model = None
         await self.db.settings.update_one({"_id": "ai_trader_config"},
                                           {"$set": dict(self.config)}, upsert=True)
         if self.config.get("enabled") and not was_enabled:
@@ -1526,7 +1525,8 @@ class AIEngine:
                 "Nutze das optionale JSON-Feld \"config_changes\" (max. 5 Einträge, NUR bei klarem, "
                 "datenbasiertem Grund – nicht bei jeder Analyse):\n"
                 '[{"symbol": "BTCUSDT", "changes": {"leverage": 8, "sl_fixed_percent": 1.2}, "reason": "kurze Begründung"}]\n'
-                'Für Engine-Einstellungen (min_confidence, cooldown_min) nutze "symbol": "ENGINE".\n'
+                'Für Engine-Einstellungen (min_confidence, cooldown_min, max_same_direction, correlation_guard) nutze "symbol": "ENGINE".\n'
+                "Den Richtungs-Guard (max_same_direction) darfst du für optimalen Profit anpassen (1-6 direkt, 0/aus nur als Vorschlag an den Trader); für Datensammel-Trades ist er ohnehin ausgesetzt.\n"
                 "STRENG VERBOTEN: max_capital / investierter Betrag / mode (paper/live) – NIE ändern oder vorschlagen.\n"
                 + tunable_spec_text())
         else:
@@ -2058,7 +2058,8 @@ class AIEngine:
                                     collection: bool = False) -> tuple:
         """Diversifikations- & Playbook-Guards (technisch erzwungen):
         Richtungs-Klumpen, Entry-Cluster in derselben Zone, gesperrte Setups.
-        Datensammel-Modus: lockereres Richtungs-Limit, Playbook-Sperren
+        Datensammel-Modus: Richtungs- und Korrelations-Guard sind AUSGESETZT
+        (Paper-Daten sollen das ML-Lernen nicht behindern), Playbook-Sperren
         gelten nicht (Paper-Daten über gesperrte Setups sind fürs ML wertvoll)."""
         try:
             open_rows = await self.db.auto_trades.find(
@@ -2067,14 +2068,13 @@ class AIEngine:
         except Exception as e:
             logger.warning(f"Diversifikations-Guard: offene Trades nicht lesbar: {e}")
             open_rows = []
-        max_same = (int(self.config.get("collection_max_same_direction", 5) or 0)
-                    if collection else int(self.config.get("max_same_direction", 3) or 0))
+        max_same = 0 if collection else int(self.config.get("max_same_direction", 3) or 0)
         allowed, why = ai_playbook.diversification_check(
             open_rows, sym, dec["action"], float(dec.get("price") or 0),
             max_same_direction=max_same,
             min_dist_pct=float(self.config.get("min_entry_distance_pct", 0.5) or 0),
             setup=dec.get("setup"),
-            correlation_guard=bool(self.config.get("correlation_guard", True)))
+            correlation_guard=(not collection) and bool(self.config.get("correlation_guard", True)))
         if not allowed:
             return False, why
         if not collection:
@@ -2432,6 +2432,16 @@ class AIEngine:
             if cd_max and c > cd_max:
                 return (f"cooldown_min {c} min über dem Autonomie-Limit "
                         f"{cd_max} min – nur der Trader darf das bestätigen")
+        if "max_same_direction" in changes:
+            try:
+                v = int(changes["max_same_direction"])
+            except (TypeError, ValueError):
+                return "max_same_direction kein gültiger Wert"
+            if v == 0 or v > 6:
+                return (f"Richtungs-Guard auf {v} ({'aus' if v == 0 else 'sehr locker'}) "
+                        "– nur der Trader darf das bestätigen")
+        if "correlation_guard" in changes and not changes["correlation_guard"]:
+            return "Korrelations-Guard abschalten – nur der Trader darf das bestätigen"
         return ""
 
     async def _normalize_auto_tuned(self):

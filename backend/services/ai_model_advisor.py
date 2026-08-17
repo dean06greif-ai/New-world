@@ -43,7 +43,20 @@ SYSTEM_TEMPLATE = (
     "- Denke in Ketten: Haupt-Modell und Fallbacks sollten möglichst "
     "verschiedene Anbieter nutzen, damit ein Rate-Limit nicht alles lahmlegt.\n"
     "- Antworte kurz, konkret und auf Deutsch. Nenne Modelle immer als "
-    "provider/modell.\n\n"
+    "provider/modell.\n"
+    "- EMPFEHLUNG ZUM ÜBERNEHMEN: Wenn der Nutzer eine konkrete Empfehlung "
+    "möchte (oder du eine klar bessere Konfiguration siehst), hänge ans ENDE "
+    "deiner Antwort GENAU EINEN maschinenlesbaren Block an:\n"
+    "<<<APPLY\n"
+    '{{"roles": {{"<rollen_key>": {{"provider": "...", "model": "...", '
+    '"fallback_provider": "...", "fallback_model": "...", '
+    '"fallback2_provider": "...", "fallback2_model": "..."}}}}, '
+    '"main": {{"provider": "...", "model": "..."}}}}\n'
+    "APPLY>>>\n"
+    "Nur Rollen/Felder aufnehmen, die du wirklich ändern willst ('main' nur bei "
+    "Haupt-Modell-Wechsel). Gültige Rollen-Keys: {role_keys}. Nur exakte "
+    "Modell-Slugs aus dem Katalog. Der Trader bekommt dann einen "
+    "„Empfehlung übernehmen“-Button.\n\n"
     "=== FREE-TIER-LIMITS (CAPS) DER ANBIETER ===\n{limits}\n\n"
     "=== VERFÜGBARE MODELLE (Gewicht 1=leicht, 3=stark · Keys: primär+Backups) ===\n{catalog}\n\n"
     "=== TOKEN-BUDGETS PRO ANFRAGE (413-Schutz, gelernt aus echten Fehlern) ===\n{budgets}\n\n"
@@ -109,7 +122,9 @@ def _health_block() -> str:
 
 
 def build_system() -> str:
+    from services.ai_roles import ROLE_LABELS
     return SYSTEM_TEMPLATE.format(
+        role_keys=", ".join(ROLE_LABELS),
         limits=FREE_TIER_LIMITS,
         catalog=_catalog_block(),
         budgets=_budget_block(),

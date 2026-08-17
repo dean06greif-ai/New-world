@@ -22,6 +22,7 @@ const AILabPanel = () => {
   const [report, setReport] = useState(null);
   const [entries, setEntries] = useState([]);
   const [busy, setBusy] = useState('');
+  const [showTrash, setShowTrash] = useState(false);
   const [tab, setTab] = useState('research');
   const [health, setHealth] = useState(null);
   const [trades, setTrades] = useState([]);
@@ -155,23 +156,33 @@ const AILabPanel = () => {
             <Cpu size={13} weight="bold" className={busy === 'ML-Training' || ml.training_now ? 'spin' : ''} />
             {ml.training_now ? 'Trainiert…' : 'ML-Training'}
           </button>
-          <button className="ai-action-btn" disabled={!!busy || research.running_now}
-            onClick={() => { if (window.confirm('Forschungs-Daten (Report & Zustand) wirklich zurücksetzen? Der nächste Lauf startet dann frisch.')) post('/api/ai/research/reset', 'Forschung zurückgesetzt'); }}
-            data-testid="ai-lab-research-reset-btn" title="Forschungs-Report & Zustand löschen"
-            style={{ color: '#FF3366' }}>
-            <Trash size={13} weight="bold" /> Forschung zurücksetzen
-          </button>
-          <button className="ai-action-btn" disabled={!!busy || ml.training_now}
-            onClick={() => { if (window.confirm('ML-Trainingsdaten (gespeichertes Modell + Status) wirklich zurücksetzen? Das nächste Training baut das Modell neu auf.')) post('/api/ai/ml/reset', 'ML-Modell zurückgesetzt'); }}
-            data-testid="ai-lab-ml-reset-btn" title="Gespeichertes ML-Modell & Trainings-Status löschen"
-            style={{ color: '#FF3366' }}>
-            <Trash size={13} weight="bold" /> ML zurücksetzen
-          </button>
           <button className="ai-action-btn" disabled={!!busy}
             onClick={() => post('/api/ai/observer/run', 'Markt-Beobachtung')}
             data-testid="ai-lab-observe-btn">
             <ArrowsClockwise size={13} weight="bold" className={busy === 'Markt-Beobachtung' ? 'spin' : ''} /> Markt scannen
           </button>
+          <div className="ai-lab-trash-wrap">
+            <button className="ai-action-btn ai-lab-trash-btn" disabled={!!busy}
+              onClick={() => setShowTrash(s => !s)}
+              data-testid="ai-lab-trash-btn"
+              title="Papierkorb: Forschungs- oder ML-Trainingsdaten zurücksetzen">
+              <Trash size={13} weight="bold" />
+            </button>
+            {showTrash && (
+              <div className="ai-lab-trash-menu" data-testid="ai-lab-trash-menu">
+                <button disabled={research.running_now}
+                  onClick={() => { setShowTrash(false); if (window.confirm('Forschungs-Daten (Report & Zustand) wirklich zurücksetzen? Der nächste Lauf startet dann frisch.')) post('/api/ai/research/reset', 'Forschung zurückgesetzt'); }}
+                  data-testid="ai-lab-research-reset-btn">
+                  Forschungsdaten zurücksetzen
+                </button>
+                <button disabled={ml.training_now}
+                  onClick={() => { setShowTrash(false); if (window.confirm('ML-Trainingsdaten (gespeichertes Modell + Status) wirklich zurücksetzen? Das nächste Training baut das Modell neu auf.')) post('/api/ai/ml/reset', 'ML-Modell zurückgesetzt'); }}
+                  data-testid="ai-lab-ml-reset-btn">
+                  ML-Trainingsdaten zurücksetzen
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

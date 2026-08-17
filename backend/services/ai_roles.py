@@ -60,14 +60,14 @@ ROLE_PRESETS: Dict[str, Dict] = {
                          "fallback_model": "nvidia/nemotron-3-super-120b-a12b:free",
                          "fallback2_provider": "cerebras", "fallback2_model": "gpt-oss-120b"},
     # Reine Datensammlung, LLM nur optional -> günstigstes Modell
-    "market_observer": {"provider": "groq", "model": "llama-3.1-8b-instant",
+    "market_observer": {"provider": "groq", "model": "openai/gpt-oss-20b",
                         "fallback_provider": "gemini", "fallback_model": "gemini-3.1-flash-lite"},
     # KRITISCH: muss zuverlässig rechnen -> starkes Gratis-Modell + 2 Fallbacks
     "trade_manager": {"provider": "groq", "model": "openai/gpt-oss-120b",
                       "fallback_provider": "cerebras", "fallback_model": "gpt-oss-120b",
                       "fallback2_provider": "gemini", "fallback2_model": "gemini-3.5-flash"},
     # 24/7-Betrieb -> billigstes Modell (gratis), günstiger Fallback
-    "news_watcher": {"provider": "groq", "model": "llama-3.1-8b-instant",
+    "news_watcher": {"provider": "groq", "model": "openai/gpt-oss-20b",
                      "fallback_provider": "gemini", "fallback_model": "gemini-3.1-flash-lite"},
     "chat": {"provider": "groq", "model": "openai/gpt-oss-120b",
              "fallback_provider": "gemini", "fallback_model": "gemini-3.5-flash"},
@@ -205,7 +205,7 @@ class AIRoleManager:
             out["model"] = None
         elif mod:
             p = prov if prov in ai_providers.ALLOWED_MODELS else ai_providers.provider_for_model(mod)
-            if p and mod in ai_providers.ALLOWED_MODELS[p]:
+            if p and mod in ai_providers.allowed_models(p):
                 out["provider"], out["model"] = p, mod
         if "active_hours" in updates:
             ah = updates["active_hours"]
@@ -218,7 +218,7 @@ class AIRoleManager:
             if f"{prefix}_model" in updates:
                 if fm:
                     p = fp if fp in ai_providers.ALLOWED_MODELS else ai_providers.provider_for_model(fm)
-                    if p and fm in ai_providers.ALLOWED_MODELS[p]:
+                    if p and fm in ai_providers.allowed_models(p):
                         out[f"{prefix}_provider"], out[f"{prefix}_model"] = p, fm
                 else:
                     out[f"{prefix}_provider"] = None

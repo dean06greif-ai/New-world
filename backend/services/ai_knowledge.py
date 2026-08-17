@@ -71,6 +71,10 @@ AI_TUNABLE_COIN_KEYS: Dict[str, Dict] = {
 AI_TUNABLE_ENGINE_KEYS: Dict[str, Dict] = {
     "min_confidence": {"type": "int", "min": 35, "max": 90, "desc": "Mindest-Konfidenz für Signale"},
     "cooldown_min": {"type": "int", "min": 0, "max": 240, "desc": "Cooldown zwischen Trades pro Coin (Minuten)"},
+    "max_same_direction": {"type": "int", "min": 0, "max": 10,
+                           "desc": "Richtungs-Guard: max. gleichzeitig offene KI-Trades in dieselbe Richtung (0 = aus). Für Datensammel-Trades immer ausgesetzt."},
+    "correlation_guard": {"type": "bool",
+                          "desc": "Korrelations-Guard: BTC/ETH/SOL zählen als EIN Richtungs-Risiko"},
 }
 
 # Diese Keys darf die KI unter KEINEN Umständen anfassen.

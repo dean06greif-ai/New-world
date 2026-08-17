@@ -18,7 +18,7 @@ settings['position_watchdog_status'] (GET /api/autotrade/watchdog/status).
 import asyncio
 import logging
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
@@ -395,10 +395,41 @@ class PositionWatchdog:
                 f"Notfall-Close FEHLGESCHLAGEN – bitte SOFORT manuell in Bitunix prüfen!")
 
     async def _adopt(self, internal: str, pos: Dict) -> Optional[Dict]:
-        """Unbekannte Börsen-Position als sichtbaren 'Extern'-Trade übernehmen."""
+        """Unbekannte Börsen-Position als sichtbaren 'Extern'-Trade übernehmen.
+
+        Rest-Erkennung: Wurde auf demselben Symbol+Seite in den letzten 30 min
+        ein Bot-Trade geschlossen, ist die Position sehr wahrscheinlich ein
+        Rundungs-/Fill-Rest dieses Closes – dann wird sie sofort an der Börse
+        bereinigt statt fälschlich als 'Manuell (Bitunix)' übernommen."""
         entry = pos["entry"] or _f(await self.client.get_mark_price(internal))
         if entry <= 0:
             return None
+        leftover_src = None
+        try:
+            cutoff = (datetime.now(timezone.utc) - timedelta(minutes=30)).isoformat()
+            leftover_src = await self.db.auto_trades.find_one({
+                "symbol": internal, "side": pos["side"], "mode": "live",
+                "status": "closed", "strategy_id": {"$ne": "external"},
+                "closed_at": {"$gte": cutoff}})
+        except Exception:
+            leftover_src = None
+        if leftover_src:
+            cleaned = False
+            try:
+                res = await self.client.flash_close(internal, pos["position_id"],
+                                                    pos["side"], pos["qty"])
+                cleaned = isinstance(res, dict) and res.get("code") == 0
+            except Exception as e:
+                logger.error(f"Watchdog: Rest-Bereinigung {internal} fehlgeschlagen: {e}")
+            src_name = leftover_src.get("strategy_name") or leftover_src.get("strategy_id") or "Bot"
+            if cleaned:
+                logger.warning(f"Watchdog: Rest-Position nach Close bereinigt: "
+                               f"{internal} {pos['side']} qty={pos['qty']} (Quelle: {src_name})")
+                await self._notify(
+                    f"🧹 *WATCHDOG*\n{internal} {pos['side']}: Rest-Position "
+                    f"(Menge {pos['qty']}) nach dem Close des Trades „{src_name}“ "
+                    f"erkannt und automatisch an der Börse geschlossen.")
+                return None
         now_iso = datetime.now(timezone.utc).isoformat()
         pct = max(abs(_f(self.settings.get("fallback_sl_percent", 2.0))), 0.1) / 100
         sl_guess = round(entry * (1 - pct) if pos["side"] == "LONG"
@@ -414,22 +445,34 @@ class PositionWatchdog:
             "max_capital": round(pos.get("margin") or 0, 6),
             "status": "open", "tp1_hit": False, "breakeven_moved": False,
             "realized_pnl": 0.0, "fees_paid": 0.0, "fee_percent": 0.06,
-            "strategy_id": "external", "strategy_name": "Manuell (Bitunix)",
-            "manual_trade": True,
+            "strategy_id": "external",
+            "strategy_name": "Rest nach Bot-Close" if leftover_src else "Manuell (Bitunix)",
+            "manual_trade": not leftover_src,
+            "leftover": bool(leftover_src),
             "external_adopted": True, "sl_exchange_missing": False,
             "bitunix_order_id": None, "bitunix_position_id": pos["position_id"],
             "bitunix_tpsl_order_id": None, "tp1_exchange_placed": False,
             "opened_at": now_iso, "trade_date": now_iso[:10],
-            "events": [f"WATCHDOG: Börsen-Position ohne lokalen Trade übernommen "
-                       f"(Menge {pos['qty']} @ {entry})"],
+            "events": [(f"WATCHDOG: Rest-Position nach Bot-Close übernommen – Bereinigung "
+                        f"an der Börse fehlgeschlagen (Menge {pos['qty']} @ {entry})")
+                       if leftover_src else
+                       (f"WATCHDOG: Börsen-Position ohne lokalen Trade übernommen "
+                        f"(Menge {pos['qty']} @ {entry})")],
         }
         await self.db.auto_trades.insert_one(dict(trade))
         logger.warning(f"Watchdog: unbekannte Börsen-Position übernommen: "
-                       f"{internal} {pos['side']} qty={pos['qty']}")
-        await self._notify(
-            f"👁️ *WATCHDOG*\n{internal} {pos['side']}: manuell eröffnete Bitunix-Position "
-            f"entdeckt (Menge {pos['qty']}, Entry `{entry}`). Sie ist jetzt als "
-            f"'Manuell (Bitunix)' auf der Website sichtbar und wird NICHT angefasst.")
+                       f"{internal} {pos['side']} qty={pos['qty']}"
+                       + (" [REST nach Bot-Close]" if leftover_src else ""))
+        if leftover_src:
+            await self._notify(
+                f"⚠️ *WATCHDOG*\n{internal} {pos['side']}: Rest-Position nach Bot-Close "
+                f"erkannt (Menge {pos['qty']}), Bereinigung an der Börse ist fehlgeschlagen – "
+                f"als 'Rest nach Bot-Close' übernommen, der Watchdog verwaltet sie weiter.")
+        else:
+            await self._notify(
+                f"👁️ *WATCHDOG*\n{internal} {pos['side']}: manuell eröffnete Bitunix-Position "
+                f"entdeckt (Menge {pos['qty']}, Entry `{entry}`). Sie ist jetzt als "
+                f"'Manuell (Bitunix)' auf der Website sichtbar und wird NICHT angefasst.")
         return trade
 
     async def _record(self, status: Dict):

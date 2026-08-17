@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ChatCircleText, PaperPlaneRight, Cpu } from '@phosphor-icons/react';
+import { ChatCircleText, PaperPlaneRight, Cpu, CheckCircle } from '@phosphor-icons/react';
+import { toast } from '../lib/toast';
 import { authHeaders } from '../auth';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
@@ -17,6 +18,8 @@ const AIModelAdvisor = () => {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
+  const [suggestion, setSuggestion] = useState(null);
+  const [applying, setApplying] = useState(false);
   const bodyRef = useRef(null);
 
   useEffect(() => {
@@ -33,6 +36,7 @@ const AIModelAdvisor = () => {
     if (!text || busy) return;
     setInput('');
     setBusy(true);
+    setSuggestion(null);
     const history = messages.slice(-10);
     setMessages(m => [...m, { role: 'user', text }, { role: 'assistant', text: '' }]);
     try {
@@ -74,7 +78,40 @@ const AIModelAdvisor = () => {
         copy[copy.length - 1] = { role: 'assistant', text: `⚠️ ${e.message}` };
         return copy;
       });
-    } finally { setBusy(false); }
+    } finally {
+      setBusy(false);
+      // Maschinenlesbaren APPLY-Block aus der fertigen Antwort ziehen:
+      // wird als „Empfehlung übernehmen“-Button angeboten statt als Rohtext.
+      setMessages(m => {
+        const copy = [...m];
+        const last = copy[copy.length - 1];
+        if (last?.role === 'assistant') {
+          const match = last.text.match(/<<<APPLY([\s\S]*?)APPLY>>>/);
+          if (match) {
+            try { setSuggestion(JSON.parse(match[1].trim())); } catch { /* ignorieren */ }
+            copy[copy.length - 1] = { ...last, text: last.text.replace(match[0], '').trim() };
+          }
+        }
+        return copy;
+      });
+    }
+  };
+
+  const applySuggestion = async () => {
+    if (!suggestion || applying) return;
+    setApplying(true);
+    try {
+      const res = await fetch(`${API_URL}/api/ai/team/advisor/apply`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify(suggestion),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || 'Übernahme fehlgeschlagen');
+      toast.success(`Übernommen: ${(data.applied || []).join(', ')}`);
+      if ((data.rejected || []).length) toast.error(`Abgelehnt: ${data.rejected.join('; ')}`);
+      setSuggestion(null);
+    } catch (e) { toast.error(e.message); } finally { setApplying(false); }
   };
 
   const builtin = catalog?.builtin || {};
@@ -134,6 +171,15 @@ const AIModelAdvisor = () => {
             </div>
           ))}
         </div>
+        {suggestion && (
+          <div className="ai-advisor-apply-row" data-testid="ai-advisor-apply-row">
+            <span>Der Berater hat eine konkrete Konfiguration vorgeschlagen.</span>
+            <button className="ai-action-btn" onClick={applySuggestion} disabled={applying}
+              data-testid="ai-advisor-apply-btn">
+              <CheckCircle size={13} weight="bold" /> {applying ? 'Übernehme…' : 'Empfehlung übernehmen'}
+            </button>
+          </div>
+        )}
         <div className="ai-advisor-input-row">
           <input type="text" value={input} data-no-select="true"
             placeholder="Frage zur Modellwahl stellen…"

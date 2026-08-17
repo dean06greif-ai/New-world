@@ -480,11 +480,11 @@ async def ai_review(body: Dict = None):
 
     base_url = (os.getenv("AI_BASE_URL") or "https://api.groq.com/openai/v1").strip()
     model_name = (os.getenv("AI_MODEL") or os.getenv("GEMINI_MODEL")
-                  or "llama-3.3-70b-versatile").strip().strip('"').strip("'").strip()
+                  or "openai/gpt-oss-120b").strip().strip('"').strip("'").strip()
     if model_name.startswith("models/"):
         model_name = model_name[len("models/"):]
     if not model_name:
-        model_name = "llama-3.3-70b-versatile"
+        model_name = "openai/gpt-oss-120b"
 
     stats = await _aggregate_ai_stats(strategy_id)
 

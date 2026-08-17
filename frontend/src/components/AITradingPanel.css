@@ -934,3 +934,15 @@
 .ai-advisor-input-row { display: flex; gap: 6px; padding: 8px; border-top: 1px solid rgba(255,255,255,0.08); }
 .ai-advisor-input-row input { flex: 1; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; padding: 7px 10px; color: var(--text-primary, #eee); font-size: 12px; }
 .ai-advisor-input-row input:focus { outline: none; border-color: rgba(240,185,11,0.5); }
+
+/* ===== KI-Labor: dezenter Papierkorb (Forschung + ML zurücksetzen) ===== */
+.ai-lab-trash-wrap { position: relative; display: inline-flex; }
+.ai-lab-trash-btn { padding: 4px 8px; opacity: 0.55; }
+.ai-lab-trash-btn:hover { opacity: 1; color: #f6465d; }
+.ai-lab-trash-menu { position: absolute; top: calc(100% + 4px); right: 0; z-index: 40; display: flex; flex-direction: column; min-width: 210px; background: var(--bg-card, #14151c); border: 1px solid rgba(255,255,255,0.12); border-radius: 8px; overflow: hidden; box-shadow: 0 8px 24px rgba(0,0,0,0.45); }
+.ai-lab-trash-menu button { all: unset; cursor: pointer; padding: 8px 12px; font-size: 11.5px; color: #f6465d; }
+.ai-lab-trash-menu button:hover { background: rgba(246,70,93,0.1); }
+.ai-lab-trash-menu button:disabled { opacity: 0.4; cursor: default; }
+
+/* ===== Modell-Berater: Empfehlung übernehmen ===== */
+.ai-advisor-apply-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 10px; border-top: 1px solid rgba(240,185,11,0.25); background: rgba(240,185,11,0.06); font-size: 11.5px; color: var(--text-secondary, #aaa); }

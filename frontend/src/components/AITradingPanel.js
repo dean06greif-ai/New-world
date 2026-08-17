@@ -767,22 +767,17 @@ const AITradingPanel = ({ onClose, selectedCoin = 'BTCUSDT' }) => {
                     data-testid={`ai-decision-row-${d?.symbol || i}`}
                   >
                     <span className="ai-dec-sym">{coinLabel(d?.symbol)}</span>
-                    <span className={`ai-dec-action ${actionClass(d?.action)}`}>{d?.action || '–'}</span>
-                    {d?.horizon === 'swing' && <span className="ai-dec-swing">SWING</span>}
-                    {String(d?.action).toUpperCase() === 'HOLD' ? (
-                      <>
-                        <span className="ai-dec-noedge" data-testid={`ai-dec-noedge-${d?.symbol || i}`}
-                          title="Hold = bewusst KEIN Trade – die KI sieht aktuell kein Setup mit klarem Vorteil (z.B. schlechtes Handelsfenster, Range ohne Level oder Trade-Sperre). Kein Fehler – der konkrete Grund steht rechts in der Begründung.">
-                          <Prohibit size={11} weight="bold" /> Hold
-                        </span>
-                        {Number(d?.confidence) > 0 && (
-                          <span className="ai-dec-conf" title="Konfidenz der HOLD-Entscheidung">{d.confidence}%</span>
-                        )}
-                      </>
-                    ) : (
-                      <span className="ai-dec-conf">{d?.confidence ?? 0}%</span>
+                    <span className={`ai-dec-action ${actionClass(d?.action)}`}
+                      title={String(d?.action).toUpperCase() === 'HOLD'
+                        ? 'Hold = bewusst KEIN Trade – die KI sieht aktuell kein Setup mit klarem Vorteil (z.B. schlechtes Handelsfenster, Range ohne Level oder Trade-Sperre). Kein Fehler – der konkrete Grund steht rechts in der Begründung.'
+                        : `${String(d?.action).toUpperCase()}-Entscheidung der KI – daneben die Konfidenz (0-100%). Gehandelt wird erst ab der eingestellten Mindest-Konfidenz.`}>
+                      {d?.action || '–'}
+                    </span>
+                    {d?.horizon === 'swing' && <span className="ai-dec-swing" title="Swing-Trade: längerer Zeithorizont mit weiteren SL/TP-Grenzen und niedrigerem Hebel (statt kurzem Scalp)">SWING</span>}
+                    {(String(d?.action).toUpperCase() !== 'HOLD' || Number(d?.confidence) > 0) && (
+                      <span className="ai-dec-conf" title="Konfidenz der Entscheidung (0-100%)">{d?.confidence ?? 0}%</span>
                     )}
-                    {d?.signaled && <span className="ai-dec-signaled" title="Signal ausgelöst"><Lightning size={11} weight="fill" /></span>}
+                    {d?.signaled && <span className="ai-dec-signaled" title="Signal ausgelöst – aus dieser Entscheidung wurde wirklich ein Trade/Signal erzeugt"><Lightning size={11} weight="fill" /></span>}
                     <span className="ai-dec-reason">{d?.reasoning || ''}</span>
                     <span className="ai-dec-expand">{open ? <CaretUp size={11} /> : <CaretDown size={11} />}</span>
                   </div>

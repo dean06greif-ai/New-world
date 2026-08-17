@@ -356,6 +356,49 @@ async def ai_models_catalog():
             "providers": ai_providers.available_providers()}
 
 
+@router.post("/api/ai/team/advisor/apply")
+async def ai_team_advisor_apply(body: Dict, _: bool = Depends(require_admin)):
+    """Empfehlung des Modell-Beraters übernehmen (Rollen + optional Haupt-Modell)."""
+    from services import ai_providers
+    roles_upd = body.get("roles") if isinstance(body.get("roles"), dict) else {}
+    main = body.get("main") if isinstance(body.get("main"), dict) else None
+    applied, rejected = [], []
+    clean: Dict = {}
+    for role, cfg in roles_upd.items():
+        if role not in ROLE_LABELS or not isinstance(cfg, dict):
+            rejected.append(f"Rolle '{role}' unbekannt")
+            continue
+        entry = {}
+        for prefix in ("", "fallback_", "fallback2_"):
+            m = cfg.get(f"{prefix}model")
+            if not m:
+                continue
+            prov = cfg.get(f"{prefix}provider") or ai_providers.provider_for_model(m)
+            if not prov or m not in ai_providers.allowed_models(prov):
+                rejected.append(f"{role}: Modell '{m}' unbekannt")
+                continue
+            entry[f"{prefix}provider"] = prov
+            entry[f"{prefix}model"] = m
+        if entry:
+            clean[role] = entry
+    if clean:
+        await role_manager.update(ai_engine.db, clean)
+        applied += [f"Rolle {ROLE_LABELS.get(r, r)}" for r in clean]
+    if main and main.get("model"):
+        m = main["model"]
+        prov = main.get("provider") or ai_providers.provider_for_model(m)
+        if prov and m in ai_providers.allowed_models(prov):
+            await ai_engine.update_config({"provider": prov, "model": m})
+            applied.append(f"Haupt-Modell -> {prov}/{m}")
+        else:
+            rejected.append(f"Haupt-Modell '{m}' unbekannt")
+    if not applied:
+        raise HTTPException(status_code=400,
+                            detail="; ".join(rejected) or "Nichts anwendbar")
+    await log_action(None, "advisor_apply", {"applied": applied, "rejected": rejected})
+    return {"status": "success", "applied": applied, "rejected": rejected}
+
+
 @router.post("/api/ai/team/advisor")
 async def ai_team_advisor(body: Dict, _: bool = Depends(require_admin)):
     """Modell-Berater (KI-Team-Reiter): neutraler Chat zur Modellwahl.

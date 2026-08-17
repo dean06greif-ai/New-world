@@ -2038,6 +2038,22 @@ class AutoTradeManager:
                     logger.info(f"{t.get('symbol')}: Close-Menge {qty} auf reale "
                                 f"Börsen-Menge {live_qty} begrenzt")
                     qty = live_qty
+                elif full and live_qty > qty:
+                    # Rest-Schutz (Bug-Report POL): beim VOLL-Close die komplette
+                    # Börsen-Menge schließen, wenn KEIN anderer lokaler Trade sich
+                    # die Position teilt – sonst bleiben Rundungs-/Fill-Reste an
+                    # der Börse zurück, die der Watchdog später fälschlich als
+                    # eigene Position übernimmt.
+                    try:
+                        others = await self.db.auto_trades.count_documents({
+                            "symbol": t["symbol"], "status": "open", "mode": "live",
+                            "id": {"$ne": t.get("id")}})
+                    except Exception:
+                        others = 1
+                    if others == 0:
+                        logger.info(f"{t.get('symbol')}: Voll-Close von {qty} auf komplette "
+                                    f"Börsen-Menge {live_qty} erweitert (Rest-Schutz)")
+                        qty = live_qty
             try:
                 res = await self.client.flash_close(t["symbol"], pid, t["side"], qty)
             except Exception as e:
